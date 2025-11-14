@@ -287,6 +287,159 @@ def setup_virtual_camera(device_id: int):
 
 
 @cli.command()
+@click.option('--model', '-m', type=click.Choice(['noise', 'segmentation', 'both']), required=True,
+              help='Model to export')
+@click.option('--output-dir', '-o', default='./models/tensorrt', help='Output directory')
+@click.option('--checkpoint', '-c', default=None, help='Model checkpoint path')
+@click.option('--no-fp16', is_flag=True, help='Disable FP16 precision')
+def export_tensorrt(model: str, output_dir: str, checkpoint: Optional[str], no_fp16: bool):
+    """Export models to TensorRT for optimized inference"""
+    import torch
+    from .models.noise_suppression import NoiseSuppressionRNN
+    from .models.segmentation import MobileNetV3Segmentation
+
+    if not torch.cuda.is_available():
+        click.echo("Error: CUDA is not available", err=True)
+        sys.exit(1)
+
+    fp16_mode = not no_fp16
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+
+    click.echo(f"\nGPU: {torch.cuda.get_device_name(0)}")
+    click.echo(f"CUDA: {torch.version.cuda}")
+    click.echo(f"FP16: {fp16_mode}\n")
+
+    try:
+        if model in ['noise', 'both']:
+            click.echo("Exporting Noise Suppression model...")
+            ns_model = NoiseSuppressionRNN(257, 256, 2).cuda().eval()
+
+            if checkpoint:
+                click.echo(f"Loading checkpoint: {checkpoint}")
+                ckpt = torch.load(checkpoint)
+                ns_model.load_state_dict(ckpt['model_state_dict'])
+
+            onnx_path, engine_path = pytorch_to_tensorrt(
+                model=ns_model,
+                input_shape=(257,),
+                output_dir=output_dir,
+                model_name='noise_suppression',
+                fp16_mode=fp16_mode
+            )
+            click.echo(f"✓ Noise suppression exported to {engine_path}\n")
+
+        if model in ['segmentation', 'both']:
+            click.echo("Exporting Background Segmentation model...")
+            seg_model = MobileNetV3Segmentation((256, 256), pretrained=True).cuda().eval()
+
+            if checkpoint:
+                ckpt = torch.load(checkpoint)
+                seg_model.load_state_dict(ckpt['model_state_dict'])
+
+            onnx_path, engine_path = pytorch_to_tensorrt(
+                model=seg_model,
+                input_shape=(3, 256, 256),
+                output_dir=output_dir,
+                model_name='segmentation',
+                fp16_mode=fp16_mode
+            )
+            click.echo(f"✓ Segmentation exported to {engine_path}\n")
+
+        click.echo(f"✓ Export complete! Engines saved in: {output_dir}")
+
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@cli.command()
+@click.option('--engine', '-e', required=True, help='Path to TensorRT engine')
+@click.option('--model-type', '-m', type=click.Choice(['noise', 'segmentation']), required=True,
+              help='Model type')
+@click.option('--warmup', default=10, help='Warmup runs')
+@click.option('--test-runs', default=100, help='Test runs')
+@click.option('--compare-pytorch', is_flag=True, help='Compare with PyTorch')
+def benchmark_tensorrt(engine: str, model_type: str, warmup: int, test_runs: int, compare_pytorch: bool):
+    """Benchmark TensorRT engine performance"""
+    import torch
+    import numpy as np
+    import time
+    from .inference.engine import TensorRTEngine
+
+    if not Path(engine).exists():
+        click.echo(f"Error: Engine not found: {engine}", err=True)
+        click.echo("\nExport models first with: linvidia export-tensorrt --model both")
+        sys.exit(1)
+
+    click.echo(f"\nGPU: {torch.cuda.get_device_name(0)}")
+    click.echo(f"Engine: {engine}\n")
+
+    try:
+        # Determine input shape
+        if model_type == 'noise':
+            input_shape = (257,)
+        else:
+            input_shape = (3, 256, 256)
+
+        # Load and benchmark
+        trt_engine = TensorRTEngine(engine, use_cuda_stream=True)
+        input_data = np.random.randn(1, *input_shape).astype(np.float32)
+
+        # Warmup
+        click.echo(f"Warming up ({warmup} runs)...")
+        for _ in range(warmup):
+            _ = trt_engine.infer(input_data)
+
+        trt_engine.reset_stats()
+
+        # Benchmark
+        click.echo(f"Benchmarking ({test_runs} runs)...")
+        latencies = []
+        for _ in range(test_runs):
+            start = time.perf_counter()
+            _ = trt_engine.infer(input_data)
+            end = time.perf_counter()
+            latencies.append((end - start) * 1000)
+
+        # Results
+        latencies = np.array(latencies)
+        click.echo("\n=== TensorRT Results ===")
+        click.echo(f"Average:  {np.mean(latencies):.3f} ms")
+        click.echo(f"Min:      {np.min(latencies):.3f} ms")
+        click.echo(f"Max:      {np.max(latencies):.3f} ms")
+        click.echo(f"P95:      {np.percentile(latencies, 95):.3f} ms")
+        click.echo(f"FPS:      {1000/np.mean(latencies):.1f}")
+
+        if compare_pytorch:
+            click.echo("\n=== PyTorch Comparison ===")
+            if model_type == 'noise':
+                from .models.noise_suppression import NoiseSuppressionRNN
+                model = NoiseSuppressionRNN(257, 256, 2).cuda().eval()
+                pt_input = torch.randn(1, 257, device='cuda')
+
+                with torch.no_grad():
+                    for _ in range(warmup):
+                        _ = model(pt_input)
+
+                    pt_latencies = []
+                    for _ in range(test_runs):
+                        torch.cuda.synchronize()
+                        start = time.perf_counter()
+                        _ = model(pt_input)
+                        torch.cuda.synchronize()
+                        end = time.perf_counter()
+                        pt_latencies.append((end - start) * 1000)
+
+                pt_avg = np.mean(pt_latencies)
+                click.echo(f"PyTorch:  {pt_avg:.3f} ms")
+                click.echo(f"Speedup:  {pt_avg/np.mean(latencies):.2f}x")
+
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@cli.command()
 def check_system():
     """Check system requirements"""
     import torch

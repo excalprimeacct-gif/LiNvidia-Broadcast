@@ -211,6 +211,7 @@ Target metrics on RTX 3060:
 - **[INSTALL.md](INSTALL.md)**: Detailed installation instructions and system setup
 - **[VIDEO_FEATURES.md](VIDEO_FEATURES.md)**: Complete guide to video features and background effects
 - **[AUTO_FRAMING.md](AUTO_FRAMING.md)**: Auto-framing modes, usage, and troubleshooting
+- **[TENSORRT.md](TENSORRT.md)**: TensorRT optimization for 2-5x faster inference
 - **[TRAINING.md](TRAINING.md)**: Training custom models and datasets
 
 ## Contributing
