@@ -42,7 +42,7 @@ models/pretrained/
 
 # Data
 data/
-datasets/
+/datasets/
 *.wav
 *.mp3
 *.flac
