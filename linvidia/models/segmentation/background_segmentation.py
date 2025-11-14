@@ -352,7 +352,9 @@ def create_segmentation_model(
     device: str = 'cuda',
     use_fp16: bool = True,
     input_size: Tuple[int, int] = (256, 256),
-    pretrained: bool = True
+    pretrained: bool = True,
+    use_tensorrt: bool = False,
+    tensorrt_engine_path: Optional[str] = None
 ) -> BackgroundSegmentationModel:
     """
     Factory function to create segmentation model
@@ -363,10 +365,24 @@ def create_segmentation_model(
         use_fp16: Use FP16 precision
         input_size: Input size
         pretrained: Use pretrained weights
+        use_tensorrt: Use TensorRT for inference (2-3x faster)
+        tensorrt_engine_path: Path to TensorRT engine (required if use_tensorrt=True)
 
     Returns:
-        BackgroundSegmentationModel instance
+        BackgroundSegmentationModel or TensorRTSegmentationEngine instance
     """
+    if use_tensorrt:
+        if not tensorrt_engine_path:
+            raise ValueError("tensorrt_engine_path is required when use_tensorrt=True")
+
+        from ...inference import TensorRTSegmentationEngine
+        return TensorRTSegmentationEngine(
+            engine_path=tensorrt_engine_path,
+            input_size=input_size,
+            use_cuda_stream=True
+        )
+
+    # PyTorch model
     if model_type == 'mobilenet':
         model = MobileNetV3Segmentation(input_size, pretrained)
     elif model_type == 'resnet':

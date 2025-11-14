@@ -270,3 +270,140 @@ class TensorRTNoiseSuppressionEngine:
     def get_latency(self) -> float:
         """Get average inference latency in ms"""
         return self.engine.get_average_latency()
+
+
+class TensorRTSegmentationEngine:
+    """
+    Specialized TensorRT engine for background segmentation
+
+    Handles preprocessing, inference, and postprocessing for person segmentation
+    """
+
+    def __init__(
+        self,
+        engine_path: str,
+        input_size: Tuple[int, int] = (256, 256),
+        use_cuda_stream: bool = True
+    ):
+        """
+        Initialize segmentation engine
+
+        Args:
+            engine_path: Path to TensorRT engine
+            input_size: Input size (H, W)
+            use_cuda_stream: Use CUDA stream
+        """
+        self.engine = TensorRTEngine(engine_path, use_cuda_stream)
+        self.input_size = input_size
+
+        # ImageNet normalization
+        self.mean = np.array([0.485, 0.456, 0.406], dtype=np.float32).reshape(1, 3, 1, 1)
+        self.std = np.array([0.229, 0.224, 0.225], dtype=np.float32).reshape(1, 3, 1, 1)
+
+    def preprocess(self, image: np.ndarray) -> np.ndarray:
+        """
+        Preprocess image for segmentation
+
+        Args:
+            image: Input image (H, W, 3) RGB in range [0, 255]
+
+        Returns:
+            Preprocessed tensor (1, 3, input_size[0], input_size[1])
+        """
+        import cv2
+
+        # Resize if needed
+        if image.shape[:2] != self.input_size:
+            image = cv2.resize(image, (self.input_size[1], self.input_size[0]))
+
+        # Convert to float and normalize to [0, 1]
+        image = image.astype(np.float32) / 255.0
+
+        # Convert HWC to CHW
+        image = np.transpose(image, (2, 0, 1))
+
+        # Add batch dimension
+        image = np.expand_dims(image, axis=0)
+
+        # Normalize with ImageNet stats
+        image = (image - self.mean) / self.std
+
+        return image
+
+    def postprocess(
+        self,
+        mask: np.ndarray,
+        original_size: Tuple[int, int],
+        smooth: bool = True
+    ) -> np.ndarray:
+        """
+        Postprocess segmentation mask
+
+        Args:
+            mask: Model output (1, 1, H, W)
+            original_size: Original image size (height, width)
+            smooth: Apply edge smoothing
+
+        Returns:
+            Mask (H, W) in range [0, 1]
+        """
+        import cv2
+
+        # Remove batch and channel dimensions
+        mask = mask.squeeze()
+
+        # Resize to original size if needed
+        if mask.shape != original_size:
+            mask = cv2.resize(mask, (original_size[1], original_size[0]))
+
+        # Smooth edges
+        if smooth:
+            kernel_size = max(3, int(original_size[0] * 0.01))
+            if kernel_size % 2 == 0:
+                kernel_size += 1
+            mask = cv2.GaussianBlur(mask, (kernel_size, kernel_size), 0)
+
+        # Clip to [0, 1] range
+        mask = np.clip(mask, 0.0, 1.0)
+
+        return mask
+
+    def segment(
+        self,
+        image: np.ndarray,
+        smooth: bool = True,
+        return_binary: bool = False,
+        threshold: float = 0.5
+    ) -> np.ndarray:
+        """
+        Segment person from background
+
+        Args:
+            image: Input image (H, W, 3) RGB
+            smooth: Apply edge smoothing
+            return_binary: Return binary mask
+            threshold: Threshold for binary mask
+
+        Returns:
+            Segmentation mask (H, W) in range [0, 1]
+        """
+        original_size = image.shape[:2]
+
+        # Preprocess
+        input_tensor = self.preprocess(image)
+
+        # Inference
+        mask = self.engine.infer(input_tensor)
+
+        # Postprocess
+        mask = self.postprocess(mask, original_size, smooth)
+
+        # Binarize if requested
+        if return_binary:
+            mask = (mask > threshold).astype(np.float32)
+
+        return mask
+
+    def get_latency(self) -> float:
+        """Get average inference latency in ms"""
+        return self.engine.get_average_latency()

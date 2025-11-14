@@ -193,6 +193,8 @@ def gui(full: bool):
 @click.option('--background', default=None, help='Background image path (for replace effect)')
 @click.option('--auto-frame', '-a', is_flag=True, help='Enable auto-framing')
 @click.option('--framing-mode', '-f', default='center', type=click.Choice(['off', 'center', 'headroom', 'tight', 'wide', 'group']), help='Auto-framing mode')
+@click.option('--tensorrt', is_flag=True, help='Use TensorRT for 2-3x faster segmentation')
+@click.option('--tensorrt-engine', default=None, help='Path to TensorRT engine (default: models/tensorrt/segmentation.engine)')
 @click.option('--output', '-o', default='window', type=click.Choice(['window', 'virtual']), help='Output type')
 @click.option('--virtual-device', default='/dev/video2', help='Virtual camera device path')
 @click.option('--duration', '-d', default=None, type=float, help='Duration in seconds')
@@ -204,6 +206,8 @@ def background_effects(
     background: Optional[str],
     auto_frame: bool,
     framing_mode: str,
+    tensorrt: bool,
+    tensorrt_engine: Optional[str],
     output: str,
     virtual_device: str,
     duration: Optional[float],
@@ -212,10 +216,24 @@ def background_effects(
     """Run real-time background effects with optional auto-framing"""
     from .utils import setup_logger
     from .background_effects import create_background_effects
+    from pathlib import Path
 
     # Setup logging
     log_level = "DEBUG" if verbose else "INFO"
     setup_logger(level=log_level)
+
+    # Handle TensorRT engine path
+    if tensorrt:
+        if tensorrt_engine is None:
+            tensorrt_engine = 'models/tensorrt/segmentation.engine'
+
+        if not Path(tensorrt_engine).exists():
+            click.echo(f"Error: TensorRT engine not found: {tensorrt_engine}", err=True)
+            click.echo("\nExport models first with:")
+            click.echo("  linvidia export-tensorrt --model segmentation")
+            sys.exit(1)
+
+        click.echo(f"Using TensorRT engine: {tensorrt_engine}")
 
     try:
         # Create background effects system
@@ -227,7 +245,9 @@ def background_effects(
             blur_strength=blur_strength,
             background_image=background,
             enable_auto_frame=auto_frame,
-            framing_mode=framing_mode
+            framing_mode=framing_mode,
+            use_tensorrt=tensorrt,
+            tensorrt_engine_path=tensorrt_engine if tensorrt else None
         )
 
         # Run

@@ -33,7 +33,9 @@ class RealtimeBackgroundEffects:
         effect: BackgroundEffect = BackgroundEffect.BLUR,
         blur_strength: int = 25,
         enable_auto_frame: bool = False,
-        framing_mode: FramingMode = FramingMode.CENTER
+        framing_mode: FramingMode = FramingMode.CENTER,
+        use_tensorrt: bool = False,
+        tensorrt_engine_path: Optional[str] = None
     ):
         """
         Initialize background effects
@@ -48,8 +50,11 @@ class RealtimeBackgroundEffects:
             blur_strength: Blur strength (1-100)
             enable_auto_frame: Enable auto-framing
             framing_mode: Auto-framing mode
+            use_tensorrt: Use TensorRT for 2-3x faster inference
+            tensorrt_engine_path: Path to TensorRT engine (required if use_tensorrt=True)
         """
         self.config = config or Config()
+        self.use_tensorrt = use_tensorrt
 
         # Video capture
         self.capture = VideoCapture(
@@ -69,13 +74,29 @@ class RealtimeBackgroundEffects:
 
         # Segmentation model
         if segmentation_model is None:
-            logger.info("Loading segmentation model...")
-            self.segmentation_model = create_segmentation_model(
-                model_type='mobilenet',
-                device='cuda',
-                use_fp16=True,
-                input_size=(256, 256)
-            )
+            if use_tensorrt:
+                logger.info("Loading TensorRT segmentation engine...")
+                if not tensorrt_engine_path:
+                    logger.warning("TensorRT enabled but no engine path provided, falling back to PyTorch")
+                    use_tensorrt = False
+                    self.use_tensorrt = False
+
+            if use_tensorrt:
+                self.segmentation_model = create_segmentation_model(
+                    use_tensorrt=True,
+                    tensorrt_engine_path=tensorrt_engine_path,
+                    input_size=(256, 256)
+                )
+                logger.info("✓ TensorRT segmentation engine loaded")
+            else:
+                logger.info("Loading PyTorch segmentation model...")
+                self.segmentation_model = create_segmentation_model(
+                    model_type='mobilenet',
+                    device='cuda',
+                    use_fp16=True,
+                    input_size=(256, 256)
+                )
+                logger.info("✓ PyTorch segmentation model loaded")
         else:
             self.segmentation_model = segmentation_model
 
@@ -316,7 +337,9 @@ def create_background_effects(
     blur_strength: int = 25,
     background_image: Optional[str] = None,
     enable_auto_frame: bool = False,
-    framing_mode: str = 'center'
+    framing_mode: str = 'center',
+    use_tensorrt: bool = False,
+    tensorrt_engine_path: Optional[str] = None
 ) -> RealtimeBackgroundEffects:
     """
     Factory function to create background effects system
@@ -330,6 +353,8 @@ def create_background_effects(
         background_image: Path to background replacement image
         enable_auto_frame: Enable auto-framing
         framing_mode: 'off', 'center', 'headroom', 'tight', 'wide', 'group'
+        use_tensorrt: Use TensorRT for 2-3x faster inference
+        tensorrt_engine_path: Path to TensorRT engine
 
     Returns:
         RealtimeBackgroundEffects instance
@@ -362,7 +387,9 @@ def create_background_effects(
         effect=effect_enum,
         blur_strength=blur_strength,
         enable_auto_frame=enable_auto_frame,
-        framing_mode=framing_enum
+        framing_mode=framing_enum,
+        use_tensorrt=use_tensorrt,
+        tensorrt_engine_path=tensorrt_engine_path
     )
 
     # Load background image if provided
