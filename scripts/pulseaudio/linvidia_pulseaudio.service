@@ -1,0 +1,13 @@
+[Unit]
+Description=LiNvidia Broadcast PulseAudio Virtual Devices
+After=pulseaudio.service
+Requires=pulseaudio.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/linvidia-setup-pulseaudio
+ExecStop=/usr/local/bin/linvidia-cleanup-pulseaudio
+
+[Install]
+WantedBy=default.target

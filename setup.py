@@ -33,8 +33,8 @@ setup(
     install_requires=requirements,
     entry_points={
         "console_scripts": [
-            "linvidia-noise-suppress=linvidia.cli:noise_suppression",
-            "linvidia-config=linvidia.cli:configure",
+            "linvidia=linvidia.cli:cli",
+            "linvidia-gui=linvidia.ui.gui:launch_gui",
         ],
     },
 )

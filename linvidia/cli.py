@@ -167,6 +167,21 @@ def show_config(config_path: str):
 
 
 @cli.command()
+def gui():
+    """Launch GUI application"""
+    try:
+        from .ui.gui import launch_gui
+        sys.exit(launch_gui())
+    except ImportError as e:
+        click.echo(f"Error: GUI dependencies not installed", err=True)
+        click.echo("Install with: pip install PyQt6")
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@cli.command()
 def check_system():
     """Check system requirements"""
     import torch

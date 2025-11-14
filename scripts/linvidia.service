@@ -1,0 +1,25 @@
+[Unit]
+Description=LiNvidia Broadcast Noise Suppression Service
+After=sound.target pulseaudio.service
+Wants=pulseaudio.service
+
+[Service]
+Type=simple
+User=%i
+Environment="DISPLAY=:0"
+Environment="PULSE_SERVER=unix:/run/user/%U/pulse/native"
+ExecStart=/usr/bin/python3 -m linvidia.cli noise-suppression --config /etc/linvidia/config.yaml
+Restart=on-failure
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/log/linvidia
+
+[Install]
+WantedBy=default.target

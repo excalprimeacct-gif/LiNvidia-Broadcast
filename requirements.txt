@@ -35,6 +35,10 @@ python-dotenv>=1.0.0
 loguru>=0.7.0
 psutil>=5.9.0
 
+# Evaluation metrics (optional but recommended)
+pesq>=0.0.4
+pystoi>=0.3.3
+
 # Optional GUI
 # PyQt6>=6.5.0
 # pyqtgraph>=0.13.0
