@@ -20,10 +20,7 @@ except ImportError:
     PYQT_AVAILABLE = False
 
 from ..audio import AudioCapture, AudioPlayback
-from ..noise_suppression import RealtimeNoiseSuppression
 from ..background_effects import RealtimeBackgroundEffects, BackgroundEffect
-from ..tracking import FramingMode
-from ..utils import Config
 
 
 class VideoEffectsWorker(QThread):

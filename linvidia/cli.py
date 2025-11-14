@@ -177,8 +177,8 @@ def gui(full: bool):
         else:
             from .ui.gui import launch_gui
             sys.exit(launch_gui())
-    except ImportError as e:
-        click.echo(f"Error: GUI dependencies not installed", err=True)
+    except ImportError:
+        click.echo("Error: GUI dependencies not installed", err=True)
         click.echo("Install with: pip install PyQt6")
         sys.exit(1)
     except Exception as e:
@@ -295,7 +295,7 @@ def check_system():
 
     # Check CUDA
     if torch.cuda.is_available():
-        click.echo(f"✓ CUDA available")
+        click.echo("✓ CUDA available")
         click.echo(f"  Device: {torch.cuda.get_device_name(0)}")
         click.echo(f"  CUDA version: {torch.version.cuda}")
         click.echo(f"  Compute capability: {torch.cuda.get_device_capability(0)}")
@@ -304,9 +304,9 @@ def check_system():
         major, minor = torch.cuda.get_device_capability(0)
         has_tensor_cores = major >= 7  # Volta (7.0) and newer
         if has_tensor_cores:
-            click.echo(f"✓ Tensor cores available")
+            click.echo("✓ Tensor cores available")
         else:
-            click.echo(f"✗ Tensor cores not available (need compute capability >= 7.0)")
+            click.echo("✗ Tensor cores not available (need compute capability >= 7.0)")
     else:
         click.echo("✗ CUDA not available")
 
@@ -319,8 +319,10 @@ def check_system():
 
     # Check audio
     try:
-        import sounddevice as sd
-        click.echo(f"✓ Audio backend available")
+        import sounddevice
+        # Verify sounddevice is importable
+        _ = sounddevice
+        click.echo("✓ Audio backend available")
         click.echo(f"  {len(AudioCapture.list_devices())} input devices")
         click.echo(f"  {len(AudioPlayback.list_devices())} output devices")
     except Exception as e:

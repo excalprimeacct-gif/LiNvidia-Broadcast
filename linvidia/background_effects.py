@@ -11,7 +11,7 @@ from loguru import logger
 
 from .video import VideoCapture, VideoDisplay, VideoProcessor, BackgroundEffect
 from .models.segmentation import create_segmentation_model, BackgroundSegmentationModel
-from .tracking import create_auto_framer, AutoFramer, FramingMode
+from .tracking import create_auto_framer, FramingMode
 from .utils import Config
 
 
@@ -106,6 +106,10 @@ class RealtimeBackgroundEffects:
         self.processing_times = []
         self.framing_times = []
 
+        # Latest timing values for display
+        self.last_seg_time = 0.0
+        self.last_proc_time = 0.0
+
     def set_effect(self, effect: BackgroundEffect):
         """Set background effect"""
         self.processor.set_effect(effect)
@@ -161,12 +165,14 @@ class RealtimeBackgroundEffects:
         mask = self.segmentation_model.segment(frame, smooth=True)
         seg_time = (time.perf_counter() - seg_start) * 1000
         self.segmentation_times.append(seg_time)
+        self.last_seg_time = seg_time
 
         # Apply effect
         proc_start = time.perf_counter()
         result = self.processor.process_frame(frame, mask)
         proc_time = (time.perf_counter() - proc_start) * 1000
         self.processing_times.append(proc_time)
+        self.last_proc_time = proc_time
 
         # Keep only last 100 samples
         if len(self.segmentation_times) > 100:
@@ -222,7 +228,7 @@ class RealtimeBackgroundEffects:
                         last_fps_update = time.time()
 
                     # Draw FPS
-                    text = f"FPS: {current_fps:.1f} | Seg: {seg_time:.1f}ms | Proc: {proc_time:.1f}ms"
+                    text = f"FPS: {current_fps:.1f} | Seg: {self.last_seg_time:.1f}ms | Proc: {self.last_proc_time:.1f}ms"
                     cv2.putText(
                         processed_frame, text, (10, 30),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2
