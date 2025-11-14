@@ -137,6 +137,10 @@ linvidia gui --full
 
 # Or just audio GUI
 linvidia gui
+
+# Or use the standalone launcher scripts
+./launch_gui_full.py    # Full GUI with auto-framing
+./launch_gui.py         # Simple audio-only GUI
 ```
 
 ## Development
