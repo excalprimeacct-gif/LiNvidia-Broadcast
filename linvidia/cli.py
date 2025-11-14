@@ -167,15 +167,114 @@ def show_config(config_path: str):
 
 
 @cli.command()
-def gui():
+@click.option('--full', is_flag=True, help='Launch full-featured GUI with audio and video')
+def gui(full: bool):
     """Launch GUI application"""
     try:
-        from .ui.gui import launch_gui
-        sys.exit(launch_gui())
+        if full:
+            from .ui.gui_full import launch_full_gui
+            sys.exit(launch_full_gui())
+        else:
+            from .ui.gui import launch_gui
+            sys.exit(launch_gui())
     except ImportError as e:
         click.echo(f"Error: GUI dependencies not installed", err=True)
         click.echo("Install with: pip install PyQt6")
         sys.exit(1)
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@cli.command()
+@click.option('--camera', '-c', default=0, type=int, help='Camera device ID')
+@click.option('--effect', '-e', default='blur', type=click.Choice(['none', 'blur', 'remove', 'replace']), help='Background effect')
+@click.option('--blur-strength', '-b', default=25, type=int, help='Blur strength (1-100)')
+@click.option('--background', default=None, help='Background image path (for replace effect)')
+@click.option('--output', '-o', default='window', type=click.Choice(['window', 'virtual']), help='Output type')
+@click.option('--virtual-device', default='/dev/video2', help='Virtual camera device path')
+@click.option('--duration', '-d', default=None, type=float, help='Duration in seconds')
+@click.option('--verbose', '-v', is_flag=True, help='Verbose output')
+def background_effects(
+    camera: int,
+    effect: str,
+    blur_strength: int,
+    background: Optional[str],
+    output: str,
+    virtual_device: str,
+    duration: Optional[float],
+    verbose: bool
+):
+    """Run real-time background effects"""
+    from .utils import setup_logger
+    from .background_effects import create_background_effects
+
+    # Setup logging
+    log_level = "DEBUG" if verbose else "INFO"
+    setup_logger(level=log_level)
+
+    try:
+        # Create background effects system
+        bg_effects = create_background_effects(
+            camera_id=camera,
+            output_type=output,
+            virtual_device=virtual_device if output == 'virtual' else None,
+            effect=effect,
+            blur_strength=blur_strength,
+            background_image=background
+        )
+
+        # Run
+        bg_effects.run(duration=duration, show_fps=True)
+
+    except KeyboardInterrupt:
+        click.echo("\nStopped by user")
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        if verbose:
+            raise
+        sys.exit(1)
+
+
+@cli.command()
+@click.option('--list-cameras', is_flag=True, help='List available cameras')
+@click.option('--check-v4l2', is_flag=True, help='Check v4l2loopback status')
+def video_devices(list_cameras: bool, check_v4l2: bool):
+    """Manage video devices"""
+    from .video import VideoCapture
+    from .video.display import check_v4l2loopback
+
+    if list_cameras or (not list_cameras and not check_v4l2):
+        click.echo("\n=== Available Cameras ===")
+        devices = VideoCapture.list_devices()
+        for dev in devices:
+            click.echo(f"[{dev['id']}] {dev['name']} ({dev['backend']})")
+
+    if check_v4l2:
+        click.echo("\n=== v4l2loopback Status ===")
+        if check_v4l2loopback():
+            click.echo("✓ v4l2loopback module loaded")
+            import os
+            virtual_devices = [f"/dev/video{i}" for i in range(10) if os.path.exists(f"/dev/video{i}")]
+            click.echo(f"Virtual devices: {', '.join(virtual_devices)}")
+        else:
+            click.echo("✗ v4l2loopback module not loaded")
+            click.echo("To install:")
+            click.echo("  sudo apt install v4l2loopback-dkms")
+            click.echo("  sudo modprobe v4l2loopback video_nr=2 card_label='LiNvidia_Broadcast'")
+
+
+@cli.command()
+@click.option('--device-id', default=2, type=int, help='Virtual device ID')
+def setup_virtual_camera(device_id: int):
+    """Setup v4l2loopback virtual camera"""
+    from .video.display import setup_virtual_camera
+
+    try:
+        device_path = setup_virtual_camera(device_id)
+        click.echo(f"✓ Virtual camera created: {device_path}")
+        click.echo("\nUsage:")
+        click.echo(f"  linvidia background-effects --output virtual --virtual-device {device_path}")
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)

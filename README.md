@@ -8,17 +8,38 @@ LiNvidia Broadcast is an open-source implementation of NVIDIA Broadcast features
 
 ### Current Features
 
+#### 🎤 Audio Features
 - **Noise Suppression**: Real-time audio noise removal using deep learning
   - Low latency (<10ms target)
   - Optimized for NVIDIA tensor cores via TensorRT
   - Support for PulseAudio and PipeWire
+  - Adjustable suppression strength
+  - Virtual microphone support
+
+#### 📹 Video Features
+- **Background Blur**: Blur background with adjustable strength
+  - Bokeh-style depth-of-field effect
+  - Adjustable blur strength (1-100)
+  - Real-time performance (30fps @ 720p)
+
+- **Background Removal**: Remove background with green screen effect
+  - Perfect for streaming and video production
+  - Clean chroma key output
+
+- **Background Replacement**: Replace background with custom images
+  - Use any image as your virtual background
+  - Automatic scaling and blending
+  - Professional meeting ready
+
+- **Virtual Camera**: v4l2loopback integration
+  - Works with Zoom, Teams, Discord, OBS, and more
+  - System-wide camera effects
 
 ### Planned Features
 
-- Background blur/replacement
-- Virtual backgrounds
 - Auto framing
 - Eye contact correction
+- Advanced lighting effects
 
 ## Requirements
 
@@ -68,14 +89,40 @@ python scripts/download_models.py
 ### Noise Suppression
 
 ```bash
-# Run with default settings (PulseAudio)
-python -m linvidia.noise_suppression
+# Run with default settings
+linvidia noise-suppression
 
 # Specify input/output devices
-python -m linvidia.noise_suppression --input "device_name" --output "device_name"
+linvidia noise-suppression --input "device_name" --output "device_name"
 
 # Adjust suppression strength
-python -m linvidia.noise_suppression --strength 0.95
+linvidia noise-suppression --strength 0.95
+```
+
+### Background Effects
+
+```bash
+# Blur background (default)
+linvidia background-effects --effect blur --blur-strength 50
+
+# Remove background (green screen)
+linvidia background-effects --effect remove
+
+# Replace background with image
+linvidia background-effects --effect replace --background /path/to/image.jpg
+
+# Output to virtual camera (for Zoom, Teams, etc.)
+linvidia background-effects --effect blur --output virtual
+```
+
+### GUI Application
+
+```bash
+# Launch full-featured GUI with both audio and video
+linvidia gui --full
+
+# Or just audio GUI
+linvidia gui
 ```
 
 ## Development
