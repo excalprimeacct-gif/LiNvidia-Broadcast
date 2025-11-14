@@ -22,6 +22,7 @@ except ImportError:
 from ..audio import AudioCapture, AudioPlayback
 from ..noise_suppression import RealtimeNoiseSuppression
 from ..background_effects import RealtimeBackgroundEffects, BackgroundEffect
+from ..tracking import FramingMode
 from ..utils import Config
 
 
@@ -39,6 +40,8 @@ class VideoEffectsWorker(QThread):
         background_image: Optional[str],
         output_type: str,
         virtual_device: Optional[str],
+        enable_auto_frame: bool = False,
+        framing_mode: str = 'center',
         parent=None
     ):
         super().__init__(parent)
@@ -48,6 +51,8 @@ class VideoEffectsWorker(QThread):
         self.background_image = background_image
         self.output_type = output_type
         self.virtual_device = virtual_device
+        self.enable_auto_frame = enable_auto_frame
+        self.framing_mode = framing_mode
         self.bg_effects = None
         self.is_running = False
 
@@ -62,7 +67,9 @@ class VideoEffectsWorker(QThread):
                 output_type=self.output_type,
                 virtual_device=self.virtual_device,
                 effect=self.effect,
-                blur_strength=self.blur_strength
+                blur_strength=self.blur_strength,
+                enable_auto_frame=self.enable_auto_frame,
+                framing_mode=self.framing_mode
             )
 
             # Load background image if provided
@@ -308,6 +315,39 @@ class LiNvidiaFullGUI(QMainWindow):
         blur_group.setLayout(blur_layout)
         layout.addWidget(blur_group)
 
+        # Auto-framing controls
+        autoframe_group = QGroupBox("Auto-Framing")
+        autoframe_layout = QVBoxLayout()
+
+        # Enable auto-framing checkbox
+        self.autoframe_enable_checkbox = QCheckBox("Enable Auto-Framing")
+        self.autoframe_enable_checkbox.setChecked(False)
+        self.autoframe_enable_checkbox.stateChanged.connect(self.update_autoframe_controls)
+        autoframe_layout.addWidget(self.autoframe_enable_checkbox)
+
+        # Framing mode selection
+        mode_layout = QHBoxLayout()
+        mode_label = QLabel("Framing Mode:")
+        mode_label.setMinimumWidth(100)
+        self.framing_mode_combo = QComboBox()
+        self.framing_mode_combo.addItem("Center", "center")
+        self.framing_mode_combo.addItem("Headroom (Professional)", "headroom")
+        self.framing_mode_combo.addItem("Tight (Close-up)", "tight")
+        self.framing_mode_combo.addItem("Wide (Show Context)", "wide")
+        self.framing_mode_combo.addItem("Group (Multiple People)", "group")
+        self.framing_mode_combo.setEnabled(False)
+        mode_layout.addWidget(mode_label)
+        mode_layout.addWidget(self.framing_mode_combo)
+        autoframe_layout.addLayout(mode_layout)
+
+        # Info label
+        self.autoframe_info_label = QLabel("Auto-framing keeps you centered and properly framed")
+        self.autoframe_info_label.setStyleSheet("color: gray; font-style: italic;")
+        autoframe_layout.addWidget(self.autoframe_info_label)
+
+        autoframe_group.setLayout(autoframe_layout)
+        layout.addWidget(autoframe_group)
+
         # Output selection
         output_group = QGroupBox("Output")
         output_layout = QVBoxLayout()
@@ -385,6 +425,11 @@ class LiNvidiaFullGUI(QMainWindow):
         """Update video blur strength while running"""
         if self.video_worker:
             self.video_worker.update_blur_strength(value)
+
+    def update_autoframe_controls(self, state):
+        """Update auto-framing controls based on checkbox state"""
+        enabled = (state == Qt.CheckState.Checked.value)
+        self.framing_mode_combo.setEnabled(enabled)
 
     def select_background_image(self):
         """Select background replacement image"""
@@ -468,11 +513,15 @@ class LiNvidiaFullGUI(QMainWindow):
             blur_strength = self.blur_strength_slider.value()
             output_type = 'window' if self.output_window_radio.isChecked() else 'virtual'
             virtual_device = '/dev/video2' if output_type == 'virtual' else None
+            enable_auto_frame = self.autoframe_enable_checkbox.isChecked()
+            framing_mode = self.framing_mode_combo.currentData()
 
             self.log_status("Starting background effects...")
             self.log_status(f"Camera: {self.camera_combo.currentText()}")
             self.log_status(f"Effect: {effect.value}")
             self.log_status(f"Output: {output_type}")
+            if enable_auto_frame:
+                self.log_status(f"Auto-framing: {framing_mode}")
 
             # Create worker
             self.video_worker = VideoEffectsWorker(
@@ -481,7 +530,9 @@ class LiNvidiaFullGUI(QMainWindow):
                 blur_strength,
                 self.background_image_path,
                 output_type,
-                virtual_device
+                virtual_device,
+                enable_auto_frame,
+                framing_mode
             )
 
             self.video_worker.status_update.connect(self.log_status)

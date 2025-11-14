@@ -11,6 +11,7 @@ from loguru import logger
 
 from .video import VideoCapture, VideoDisplay, VideoProcessor, BackgroundEffect
 from .models.segmentation import create_segmentation_model, BackgroundSegmentationModel
+from .tracking import create_auto_framer, AutoFramer, FramingMode
 from .utils import Config
 
 
@@ -30,7 +31,9 @@ class RealtimeBackgroundEffects:
         output_type: str = 'window',
         virtual_device: Optional[str] = None,
         effect: BackgroundEffect = BackgroundEffect.BLUR,
-        blur_strength: int = 25
+        blur_strength: int = 25,
+        enable_auto_frame: bool = False,
+        framing_mode: FramingMode = FramingMode.CENTER
     ):
         """
         Initialize background effects
@@ -43,6 +46,8 @@ class RealtimeBackgroundEffects:
             virtual_device: Path to v4l2loopback device
             effect: Background effect to apply
             blur_strength: Blur strength (1-100)
+            enable_auto_frame: Enable auto-framing
+            framing_mode: Auto-framing mode
         """
         self.config = config or Config()
 
@@ -81,6 +86,16 @@ class RealtimeBackgroundEffects:
             edge_smoothing=True
         )
 
+        # Auto-framing (optional)
+        self.enable_auto_frame = enable_auto_frame
+        self.auto_framer = None
+        if enable_auto_frame:
+            logger.info("Initializing auto-framing...")
+            self.auto_framer = create_auto_framer(
+                output_size=(1280, 720),
+                mode=framing_mode
+            )
+
         # State
         self.is_running = False
 
@@ -89,6 +104,7 @@ class RealtimeBackgroundEffects:
         self.total_time = 0.0
         self.segmentation_times = []
         self.processing_times = []
+        self.framing_times = []
 
     def set_effect(self, effect: BackgroundEffect):
         """Set background effect"""
@@ -117,6 +133,12 @@ class RealtimeBackgroundEffects:
         self.processor.set_background_image(bg_image)
         logger.info(f"Background image loaded: {image_path}")
 
+    def set_framing_mode(self, mode: FramingMode):
+        """Set auto-framing mode"""
+        if self.auto_framer:
+            self.auto_framer.set_mode(mode)
+            logger.info(f"Framing mode changed to: {mode.value}")
+
     def process_frame(self, frame: np.ndarray) -> np.ndarray:
         """
         Process single frame
@@ -127,6 +149,13 @@ class RealtimeBackgroundEffects:
         Returns:
             Processed frame
         """
+        # Auto-framing (before effects)
+        if self.enable_auto_frame and self.auto_framer:
+            frame_start = time.perf_counter()
+            frame = self.auto_framer.process_frame(frame)
+            frame_time = (time.perf_counter() - frame_start) * 1000
+            self.framing_times.append(frame_time)
+
         # Segmentation
         seg_start = time.perf_counter()
         mask = self.segmentation_model.segment(frame, smooth=True)
@@ -144,6 +173,8 @@ class RealtimeBackgroundEffects:
             self.segmentation_times.pop(0)
         if len(self.processing_times) > 100:
             self.processing_times.pop(0)
+        if len(self.framing_times) > 100:
+            self.framing_times.pop(0)
 
         return result
 
@@ -249,12 +280,15 @@ class RealtimeBackgroundEffects:
         avg_total = self.total_time / self.frames_processed
         avg_seg = np.mean(self.segmentation_times) if self.segmentation_times else 0
         avg_proc = np.mean(self.processing_times) if self.processing_times else 0
+        avg_frame = np.mean(self.framing_times) if self.framing_times else 0
         fps = 1000 / avg_total if avg_total > 0 else 0
 
         logger.info("=== Performance Statistics ===")
         logger.info(f"Frames processed: {self.frames_processed}")
         logger.info(f"Average FPS: {fps:.1f}")
         logger.info(f"Total latency: {avg_total:.2f} ms")
+        if self.enable_auto_frame:
+            logger.info(f"  Auto-framing: {avg_frame:.2f} ms")
         logger.info(f"  Segmentation: {avg_seg:.2f} ms")
         logger.info(f"  Processing: {avg_proc:.2f} ms")
 
@@ -274,7 +308,9 @@ def create_background_effects(
     virtual_device: Optional[str] = None,
     effect: str = 'blur',
     blur_strength: int = 25,
-    background_image: Optional[str] = None
+    background_image: Optional[str] = None,
+    enable_auto_frame: bool = False,
+    framing_mode: str = 'center'
 ) -> RealtimeBackgroundEffects:
     """
     Factory function to create background effects system
@@ -286,6 +322,8 @@ def create_background_effects(
         effect: 'none', 'blur', 'remove', 'replace'
         blur_strength: Blur strength (1-100)
         background_image: Path to background replacement image
+        enable_auto_frame: Enable auto-framing
+        framing_mode: 'off', 'center', 'headroom', 'tight', 'wide', 'group'
 
     Returns:
         RealtimeBackgroundEffects instance
@@ -299,13 +337,26 @@ def create_background_effects(
     }
     effect_enum = effect_map.get(effect.lower(), BackgroundEffect.BLUR)
 
+    # Convert framing mode string to enum
+    framing_map = {
+        'off': FramingMode.OFF,
+        'center': FramingMode.CENTER,
+        'headroom': FramingMode.HEADROOM,
+        'tight': FramingMode.TIGHT,
+        'wide': FramingMode.WIDE,
+        'group': FramingMode.GROUP
+    }
+    framing_enum = framing_map.get(framing_mode.lower(), FramingMode.CENTER)
+
     # Create system
     bg_effects = RealtimeBackgroundEffects(
         camera_id=camera_id,
         output_type=output_type,
         virtual_device=virtual_device,
         effect=effect_enum,
-        blur_strength=blur_strength
+        blur_strength=blur_strength,
+        enable_auto_frame=enable_auto_frame,
+        framing_mode=framing_enum
     )
 
     # Load background image if provided

@@ -191,6 +191,8 @@ def gui(full: bool):
 @click.option('--effect', '-e', default='blur', type=click.Choice(['none', 'blur', 'remove', 'replace']), help='Background effect')
 @click.option('--blur-strength', '-b', default=25, type=int, help='Blur strength (1-100)')
 @click.option('--background', default=None, help='Background image path (for replace effect)')
+@click.option('--auto-frame', '-a', is_flag=True, help='Enable auto-framing')
+@click.option('--framing-mode', '-f', default='center', type=click.Choice(['off', 'center', 'headroom', 'tight', 'wide', 'group']), help='Auto-framing mode')
 @click.option('--output', '-o', default='window', type=click.Choice(['window', 'virtual']), help='Output type')
 @click.option('--virtual-device', default='/dev/video2', help='Virtual camera device path')
 @click.option('--duration', '-d', default=None, type=float, help='Duration in seconds')
@@ -200,12 +202,14 @@ def background_effects(
     effect: str,
     blur_strength: int,
     background: Optional[str],
+    auto_frame: bool,
+    framing_mode: str,
     output: str,
     virtual_device: str,
     duration: Optional[float],
     verbose: bool
 ):
-    """Run real-time background effects"""
+    """Run real-time background effects with optional auto-framing"""
     from .utils import setup_logger
     from .background_effects import create_background_effects
 
@@ -221,7 +225,9 @@ def background_effects(
             virtual_device=virtual_device if output == 'virtual' else None,
             effect=effect,
             blur_strength=blur_strength,
-            background_image=background
+            background_image=background,
+            enable_auto_frame=auto_frame,
+            framing_mode=framing_mode
         )
 
         # Run
