@@ -217,6 +217,39 @@ Contributions welcome! Please see CONTRIBUTING.md for guidelines.
 
 MIT License - see LICENSE file for details.
 
+---
+
+## TL;DR
+
+**What is it?** Open-source NVIDIA Broadcast alternative for Linux with AI-powered audio and video effects.
+
+**Key Features:**
+- 🎤 **Noise Suppression**: Remove background noise with <10ms latency using tensor cores
+- 📹 **Background Effects**: Blur, remove, or replace backgrounds in real-time
+- 🎯 **Auto-Framing**: AI face tracking with 6 professional framing modes
+- 🎥 **Virtual Camera**: Works with Zoom, Teams, Discord, OBS via v4l2loopback
+
+**Quick Start:**
+```bash
+# Install
+git clone https://github.com/hellasleeper108/LiNvidia-Broadcast.git
+cd LiNvidia-Broadcast
+./scripts/install.sh
+
+# Try it
+linvidia background-effects --effect blur --auto-frame --framing-mode headroom
+linvidia noise-suppression
+linvidia gui --full
+```
+
+**Requirements:** NVIDIA RTX GPU (tensor cores), CUDA 11.0+, Linux
+
+**Performance:** ~35ms video latency, <10ms audio latency @ 30fps 720p on RTX 3060
+
+📖 Full docs: [INSTALL.md](INSTALL.md) | [VIDEO_FEATURES.md](VIDEO_FEATURES.md) | [AUTO_FRAMING.md](AUTO_FRAMING.md)
+
+---
+
 ## Acknowledgments
 
 - Inspired by NVIDIA Broadcast
