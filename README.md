@@ -31,15 +31,22 @@ LiNvidia Broadcast is an open-source implementation of NVIDIA Broadcast features
   - Automatic scaling and blending
   - Professional meeting ready
 
+- **Auto-Framing**: Intelligent automatic framing with face tracking
+  - AI-powered face detection using MediaPipe
+  - Multi-person tracking with temporal smoothing
+  - 6 framing modes: Center, Headroom, Tight, Wide, Group, and Off
+  - Smooth transitions with smart cropping
+  - Professional-quality framing rules (Rule of Thirds)
+
 - **Virtual Camera**: v4l2loopback integration
   - Works with Zoom, Teams, Discord, OBS, and more
   - System-wide camera effects
 
 ### Planned Features
 
-- Auto framing
 - Eye contact correction
 - Advanced lighting effects
+- Portrait relighting
 
 ## Requirements
 
@@ -111,8 +118,15 @@ linvidia background-effects --effect remove
 # Replace background with image
 linvidia background-effects --effect replace --background /path/to/image.jpg
 
-# Output to virtual camera (for Zoom, Teams, etc.)
-linvidia background-effects --effect blur --output virtual
+# Enable auto-framing with professional headroom mode
+linvidia background-effects --effect blur --auto-frame --framing-mode headroom
+
+# Combine effects: blur + auto-framing to virtual camera
+linvidia background-effects --effect blur --blur-strength 40 \
+  --auto-frame --framing-mode center --output virtual
+
+# Group framing for multiple people
+linvidia background-effects --auto-frame --framing-mode group
 ```
 
 ### GUI Application
@@ -135,15 +149,24 @@ linvidia/
 │   ├── capture.py     # Audio input handling
 │   ├── playback.py    # Audio output handling
 │   └── processing.py  # STFT, windowing, framing
+├── video/             # Video I/O and processing
+│   ├── capture.py     # Camera input handling
+│   ├── display.py     # Video output and virtual camera
+│   └── processing.py  # Video effects processing
 ├── models/            # Neural network models
 │   ├── noise_suppression.py
-│   └── architectures/
+│   └── segmentation/  # Background segmentation models
+├── tracking/          # Face detection and auto-framing
+│   ├── face_detector.py   # MediaPipe/OpenCV face detection
+│   ├── face_tracker.py    # Multi-object tracking
+│   └── auto_frame.py      # Auto-framing logic
 ├── inference/         # TensorRT inference engine
 │   ├── engine.py
 │   └── optimizer.py
 ├── ui/               # User interface
 │   ├── cli.py
-│   └── gui.py
+│   ├── gui.py
+│   └── gui_full.py   # Full-featured GUI with video
 └── utils/            # Utilities and helpers
 ```
 
@@ -174,9 +197,17 @@ The noise suppression model is based on recurrent neural networks (RNN) with:
 ## Performance
 
 Target metrics on RTX 3060:
-- Latency: <8ms (capture to playback)
-- Throughput: >100 streams @ 48kHz
-- Quality: PESQ >4.0, SNR improvement >15dB
+- **Audio**: <8ms latency (capture to playback)
+- **Video**: ~35ms total latency with all effects enabled
+- **FPS**: 28-30 fps @ 720p with background effects + auto-framing
+- **Quality**: PESQ >4.0, SNR improvement >15dB (audio)
+
+## Documentation
+
+- **[INSTALL.md](INSTALL.md)**: Detailed installation instructions and system setup
+- **[VIDEO_FEATURES.md](VIDEO_FEATURES.md)**: Complete guide to video features and background effects
+- **[AUTO_FRAMING.md](AUTO_FRAMING.md)**: Auto-framing modes, usage, and troubleshooting
+- **[TRAINING.md](TRAINING.md)**: Training custom models and datasets
 
 ## Contributing
 

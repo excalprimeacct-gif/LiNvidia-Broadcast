@@ -55,6 +55,9 @@ sudo apt install nvidia-driver-535 nvidia-cuda-toolkit
 # Audio development files
 sudo apt install portaudio19-dev python3-pyaudio pulseaudio
 
+# Video dependencies
+sudo apt install v4l2loopback-dkms v4l-utils
+
 # Python development
 sudo apt install python3-dev python3-pip python3-venv
 ```
@@ -67,6 +70,9 @@ sudo pacman -S nvidia nvidia-utils cuda
 
 # Audio
 sudo pacman -S portaudio python-pyaudio pulseaudio
+
+# Video
+sudo pacman -S v4l2loopback-dkms v4l-utils
 
 # Python
 sudo pacman -S python python-pip
@@ -165,6 +171,31 @@ For system-wide noise suppression:
 ./scripts/pulseaudio/cleanup_virtual_device.sh
 ```
 
+### Setup Virtual Camera for Video Effects (Optional)
+
+For system-wide video effects with Zoom, Teams, Discord, etc.:
+
+```bash
+# Load v4l2loopback module
+sudo modprobe v4l2loopback video_nr=2 card_label='LiNvidia_Broadcast' exclusive_caps=1
+
+# Make it persistent (load on boot)
+echo "v4l2loopback" | sudo tee -a /etc/modules
+
+# Configure module options
+echo "options v4l2loopback video_nr=2 card_label='LiNvidia_Broadcast' exclusive_caps=1" | \
+    sudo tee /etc/modprobe.d/v4l2loopback.conf
+
+# Verify virtual camera exists
+ls -l /dev/video*
+```
+
+Or use the built-in command:
+
+```bash
+linvidia setup-virtual-camera --device-id 2
+```
+
 ### Create Configuration
 
 ```bash
@@ -227,10 +258,38 @@ pip install --force-reinstall -e .
 ### Permission Errors
 
 ```bash
-# Add user to audio group
-sudo usermod -a -G audio $USER
+# Add user to audio and video groups
+sudo usermod -a -G audio,video $USER
 
 # Log out and log back in
+```
+
+### Virtual Camera Not Working
+
+```bash
+# Check if v4l2loopback is loaded
+lsmod | grep v4l2loopback
+
+# Load the module
+sudo modprobe v4l2loopback video_nr=2 card_label='LiNvidia_Broadcast' exclusive_caps=1
+
+# Check available video devices
+v4l2-ctl --list-devices
+
+# Verify permissions
+ls -l /dev/video*
+```
+
+### MediaPipe Installation Issues
+
+If you encounter issues with MediaPipe (for auto-framing):
+
+```bash
+# Try installing with specific version
+pip install mediapipe==0.10.9
+
+# On some systems, you may need system dependencies
+sudo apt install ffmpeg libsm6 libxext6
 ```
 
 ## Docker Installation (Alternative)
@@ -284,9 +343,13 @@ pip uninstall linvidia-broadcast
 After installation:
 
 1. **Test Audio**: Run `python scripts/test_audio.py` to verify audio I/O
-2. **Train Model**: Follow [TRAINING.md](TRAINING.md) to train on your data
-3. **Run GUI**: Execute `linvidia-gui` for graphical interface
-4. **Configure**: Customize settings in `~/.config/linvidia/config.yaml`
+2. **Test Video**: Run `linvidia background-effects --effect blur` to test video
+3. **Try Auto-Framing**: Run `linvidia background-effects --auto-frame --framing-mode center`
+4. **Setup Virtual Camera**: Follow the virtual camera setup above for use with Zoom/Teams
+5. **Train Model**: Follow [TRAINING.md](TRAINING.md) to train custom models
+6. **Run GUI**: Execute `linvidia gui --full` for graphical interface
+7. **Configure**: Customize settings in `~/.config/linvidia/config.yaml`
+8. **Read Docs**: Check [VIDEO_FEATURES.md](VIDEO_FEATURES.md) and [AUTO_FRAMING.md](AUTO_FRAMING.md)
 
 ## Getting Help
 
