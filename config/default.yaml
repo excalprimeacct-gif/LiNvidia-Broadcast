@@ -1,0 +1,26 @@
+# LiNvidia Broadcast Configuration
+
+audio:
+  sample_rate: 48000      # Audio sample rate in Hz
+  channels: 1             # Number of audio channels (1=mono, 2=stereo)
+  frame_size: 480         # Frame size in samples (10ms at 48kHz)
+  hop_size: 240           # Hop size in samples (5ms at 48kHz)
+  n_fft: 512             # FFT size
+  window: hann           # Window function (hann, hamming, blackman)
+
+model:
+  freq_bins: 257         # Number of frequency bins (n_fft // 2 + 1)
+  hidden_size: 256       # GRU hidden size
+  num_layers: 2          # Number of GRU layers
+  use_fp16: true         # Use FP16 precision (tensor cores)
+  device: cuda           # Device (cuda, cpu)
+
+inference:
+  use_tensorrt: true     # Use TensorRT engine if available
+  engine_path: null      # Path to TensorRT engine (null = use PyTorch)
+  batch_size: 1          # Batch size
+  use_cuda_stream: true  # Use CUDA streams for async execution
+
+noise_suppression:
+  strength: 0.95         # Suppression strength (0-1)
+  enable: true           # Enable noise suppression
