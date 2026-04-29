@@ -87,6 +87,26 @@ ok "Databases refreshed"
 # Wishlist of every package we'd like from pacman. Anything missing locally
 # is filtered out; anything that's not in the user's repos at all gets a
 # warning and falls through to pip later.
+# python-pytorch and python-pytorch-cuda are mutually exclusive (the CUDA
+# build replaces the CPU build). Pick the right one based on whether the
+# NVIDIA driver is loaded.
+if command -v nvidia-smi >/dev/null 2>&1; then
+    PYTORCH_PKG=python-pytorch-cuda
+else
+    PYTORCH_PKG=python-pytorch
+fi
+
+# If the *other* pytorch flavor is already installed, swap it out before
+# adding our pick (otherwise pacman aborts on the conflict).
+OTHER_PYTORCH=python-pytorch
+[[ "$PYTORCH_PKG" == python-pytorch ]] && OTHER_PYTORCH=python-pytorch-cuda
+if pkg_installed "$OTHER_PYTORCH"; then
+    warn "$OTHER_PYTORCH is installed and conflicts with $PYTORCH_PKG."
+    info "Removing $OTHER_PYTORCH so $PYTORCH_PKG can be installed..."
+    sudo pacman -Rdd --noconfirm "$OTHER_PYTORCH" || \
+        warn "Could not remove $OTHER_PYTORCH automatically; continuing."
+fi
+
 WISHLIST=(
     base-devel
     git
@@ -99,8 +119,7 @@ WISHLIST=(
     python-click
     python-pyqt6
     python-opencv
-    python-pytorch
-    python-pytorch-cuda
+    "$PYTORCH_PKG"
     python-torchvision
     python-sounddevice
     python-pyaudio
