@@ -79,8 +79,32 @@ The noise suppression system uses:
 
 ## Installation
 
+### CachyOS / Arch Linux (native, recommended)
+
+A native pacman package and `.desktop` launcher are provided. Build & install
+with one command:
+
 ```bash
-# Clone the repository
+git clone https://github.com/hellasleeper108/LiNvidia-Broadcast.git
+cd LiNvidia-Broadcast
+./scripts/install_cachyos.sh
+```
+
+This pulls system dependencies via `pacman`, builds the
+`linvidia-broadcast` package using the bundled
+[`packaging/cachyos/PKGBUILD`](packaging/cachyos/PKGBUILD), installs it
+system-wide, registers a desktop launcher (search "LiNvidia Broadcast"),
+and loads the `v4l2loopback` virtual-camera module.
+
+After install:
+
+- Launch from the app menu, or run `linvidia-gui`
+- CLI: `linvidia --help`
+- Uninstall: `sudo pacman -R linvidia-broadcast`
+
+### Other Linux (manual / pip)
+
+```bash
 git clone https://github.com/hellasleeper108/LiNvidia-Broadcast.git
 cd LiNvidia-Broadcast
 

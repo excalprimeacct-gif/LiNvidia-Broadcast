@@ -34,7 +34,8 @@ setup(
     entry_points={
         "console_scripts": [
             "linvidia=linvidia.cli:cli",
-            "linvidia-gui=linvidia.ui.gui:launch_gui",
+            "linvidia-gui=linvidia.ui.gui_full:launch_full_gui",
+            "linvidia-gui-simple=linvidia.ui.gui:launch_gui",
         ],
     },
 )
