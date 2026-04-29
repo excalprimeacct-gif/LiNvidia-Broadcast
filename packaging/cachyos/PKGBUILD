@@ -1,0 +1,98 @@
+# Maintainer: LiNvidia Broadcast Contributors
+pkgname=linvidia-broadcast
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Linux NVIDIA Broadcast alternative: real-time AI noise suppression, background effects, and auto-framing"
+arch=('any')
+url="https://github.com/hellasleeper108/LiNvidia-Broadcast"
+license=('MIT')
+
+# Runtime deps available in Arch/CachyOS official repos.
+# CUDA / TensorRT / mediapipe / pesq / pystoi etc. are pulled in via pip
+# during install if missing, but it is strongly recommended to install
+# `cuda` and `nvidia-utils` system-wide first.
+depends=(
+    'python'
+    'python-numpy'
+    'python-scipy'
+    'python-yaml'
+    'python-click'
+    'python-pyqt6'
+    'python-sounddevice'
+    'python-pyaudio'
+    'python-opencv'
+    'python-pytorch-cuda'
+    'python-torchvision'
+    'portaudio'
+    'pulseaudio'
+    'v4l-utils'
+    'v4l2loopback-dkms'
+    'hicolor-icon-theme'
+)
+optdepends=(
+    'cuda: GPU acceleration via CUDA'
+    'tensorrt: 2-5x faster inference via TensorRT'
+    'python-pycuda: TensorRT inference helper'
+    'python-onnx: ONNX model export'
+    'python-mediapipe: Face detection backend for auto-framing'
+    'python-loguru: Pretty logging'
+)
+makedepends=('python-build' 'python-installer' 'python-setuptools' 'python-wheel')
+
+# Build from local source tree (the parent of the packaging/ directory).
+source=()
+sha256sums=()
+
+# Use the parent project tree as the build source by default. If you would
+# rather build from a release tarball, replace `_srcdir` with the unpacked
+# tarball directory and add the source URL above.
+_srcdir="$startdir/../.."
+
+prepare() {
+    cp -a "$_srcdir" "$srcdir/$pkgname-$pkgver"
+    cd "$srcdir/$pkgname-$pkgver"
+    # Strip any local build artifacts
+    rm -rf build dist *.egg-info
+}
+
+build() {
+    cd "$srcdir/$pkgname-$pkgver"
+    python -m build --wheel --no-isolation
+}
+
+package() {
+    cd "$srcdir/$pkgname-$pkgver"
+
+    # Install python wheel
+    python -m installer --destdir="$pkgdir" dist/*.whl
+
+    # Desktop entry
+    install -Dm644 packaging/desktop/linvidia-broadcast.desktop \
+        "$pkgdir/usr/share/applications/linvidia-broadcast.desktop"
+
+    # Icon (scalable)
+    install -Dm644 packaging/icons/linvidia-broadcast.svg \
+        "$pkgdir/usr/share/icons/hicolor/scalable/apps/linvidia-broadcast.svg"
+
+    # Default config
+    install -Dm644 config/default.yaml \
+        "$pkgdir/usr/share/linvidia-broadcast/default.yaml"
+
+    # License
+    install -Dm644 LICENSE \
+        "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+
+    # Docs
+    install -Dm644 README.md \
+        "$pkgdir/usr/share/doc/$pkgname/README.md"
+    install -Dm644 INSTALL.md \
+        "$pkgdir/usr/share/doc/$pkgname/INSTALL.md"
+
+    # v4l2loopback module preload config so the virtual camera survives reboots.
+    install -Dm644 /dev/stdin "$pkgdir/usr/lib/modules-load.d/linvidia-broadcast.conf" <<EOF
+v4l2loopback
+EOF
+    install -Dm644 /dev/stdin "$pkgdir/usr/lib/modprobe.d/linvidia-broadcast.conf" <<EOF
+options v4l2loopback video_nr=10 card_label=LiNvidia_Broadcast exclusive_caps=1
+EOF
+}

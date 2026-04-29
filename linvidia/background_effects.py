@@ -9,10 +9,28 @@ import time
 from typing import Optional
 from loguru import logger
 
+from typing import Union
+
 from .video import VideoCapture, VideoDisplay, VideoProcessor, BackgroundEffect
 from .models.segmentation import create_segmentation_model, BackgroundSegmentationModel
 from .tracking import create_auto_framer, FramingMode
 from .utils import Config
+
+
+_FRAMING_MODE_MAP = {
+    'off': FramingMode.OFF,
+    'center': FramingMode.CENTER,
+    'headroom': FramingMode.HEADROOM,
+    'tight': FramingMode.TIGHT,
+    'wide': FramingMode.WIDE,
+    'group': FramingMode.GROUP,
+}
+
+
+def _coerce_framing_mode(mode: Union[str, FramingMode]) -> FramingMode:
+    if isinstance(mode, FramingMode):
+        return mode
+    return _FRAMING_MODE_MAP.get(str(mode).lower(), FramingMode.CENTER)
 
 
 class RealtimeBackgroundEffects:
@@ -33,7 +51,7 @@ class RealtimeBackgroundEffects:
         effect: BackgroundEffect = BackgroundEffect.BLUR,
         blur_strength: int = 25,
         enable_auto_frame: bool = False,
-        framing_mode: FramingMode = FramingMode.CENTER,
+        framing_mode: Union[FramingMode, str] = FramingMode.CENTER,
         use_tensorrt: bool = False,
         tensorrt_engine_path: Optional[str] = None
     ):
@@ -114,7 +132,7 @@ class RealtimeBackgroundEffects:
             logger.info("Initializing auto-framing...")
             self.auto_framer = create_auto_framer(
                 output_size=(1280, 720),
-                mode=framing_mode
+                mode=_coerce_framing_mode(framing_mode)
             )
 
         # State
@@ -158,9 +176,10 @@ class RealtimeBackgroundEffects:
         self.processor.set_background_image(bg_image)
         logger.info(f"Background image loaded: {image_path}")
 
-    def set_framing_mode(self, mode: FramingMode):
+    def set_framing_mode(self, mode: Union[FramingMode, str]):
         """Set auto-framing mode"""
         if self.auto_framer:
+            mode = _coerce_framing_mode(mode)
             self.auto_framer.set_mode(mode)
             logger.info(f"Framing mode changed to: {mode.value}")
 

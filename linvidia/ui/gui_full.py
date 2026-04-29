@@ -21,6 +21,7 @@ except ImportError:
 
 from ..audio import AudioCapture, AudioPlayback
 from ..background_effects import RealtimeBackgroundEffects, BackgroundEffect
+from .gui import NoiseSuppressionWorker
 
 
 class VideoEffectsWorker(QThread):
@@ -73,18 +74,17 @@ class VideoEffectsWorker(QThread):
             if self.background_image and self.effect == BackgroundEffect.REPLACE:
                 self.bg_effects.set_background_image(self.background_image)
 
-            # Start
+            # Start capture/display, then process frames in this worker thread
             self.status_update.emit("Running...")
             self.bg_effects.start()
             self.is_running = True
 
-            # Keep thread alive
-            while self.is_running:
-                # Process frames
+            while self.is_running and self.bg_effects.is_running:
                 frame = self.bg_effects.capture.read(timeout=1.0)
-                if frame is not None:
-                    processed = self.bg_effects.process_frame(frame)
-                    self.bg_effects.display.show(processed)
+                if frame is None:
+                    continue
+                processed = self.bg_effects.process_frame(frame)
+                self.bg_effects.display.show(processed)
 
         except Exception as e:
             self.error_occurred.emit(str(e))
@@ -96,6 +96,8 @@ class VideoEffectsWorker(QThread):
     def stop(self):
         """Stop background effects"""
         self.is_running = False
+        if self.bg_effects:
+            self.bg_effects.is_running = False
 
     def update_effect(self, effect: BackgroundEffect):
         """Update effect while running"""
@@ -425,7 +427,8 @@ class LiNvidiaFullGUI(QMainWindow):
 
     def update_autoframe_controls(self, state):
         """Update auto-framing controls based on checkbox state"""
-        enabled = (state == Qt.CheckState.Checked.value)
+        # PyQt6 emits an int for stateChanged; compare against Qt.CheckState.Checked
+        enabled = self.autoframe_enable_checkbox.isChecked()
         self.framing_mode_combo.setEnabled(enabled)
 
     def select_background_image(self):
@@ -466,10 +469,7 @@ class LiNvidiaFullGUI(QMainWindow):
             self.log_status(f"Output: {output_device}")
             self.log_status(f"Strength: {strength:.2f}")
 
-            # Import here to avoid circular dependency
-            from ..noise_suppression import RealtimeNoiseSuppressionWorker
-
-            self.audio_worker = RealtimeNoiseSuppressionWorker(
+            self.audio_worker = NoiseSuppressionWorker(
                 input_device,
                 output_device,
                 strength

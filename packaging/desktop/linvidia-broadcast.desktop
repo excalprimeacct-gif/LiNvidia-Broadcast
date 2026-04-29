@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=LiNvidia Broadcast
+GenericName=AI Audio & Video Effects
+Comment=Real-time AI-powered noise suppression, background effects, and auto-framing
+Exec=linvidia-gui
+Icon=linvidia-broadcast
+Terminal=false
+Categories=AudioVideo;Audio;Video;Recorder;Utility;
+Keywords=noise;suppression;broadcast;nvidia;background;blur;camera;webcam;
+StartupNotify=true
+StartupWMClass=LiNvidia Broadcast
