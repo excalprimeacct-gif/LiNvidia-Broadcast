@@ -6,6 +6,7 @@ Integrates video capture, segmentation, and effects processing
 
 import numpy as np
 import time
+from collections import deque
 from typing import Optional
 from loguru import logger
 
@@ -138,12 +139,12 @@ class RealtimeBackgroundEffects:
         # State
         self.is_running = False
 
-        # Stats
+        # Stats (bounded ring-buffers)
         self.frames_processed = 0
         self.total_time = 0.0
-        self.segmentation_times = []
-        self.processing_times = []
-        self.framing_times = []
+        self.segmentation_times = deque(maxlen=100)
+        self.processing_times = deque(maxlen=100)
+        self.framing_times = deque(maxlen=100)
 
         # Latest timing values for display
         self.last_seg_time = 0.0
@@ -213,14 +214,6 @@ class RealtimeBackgroundEffects:
         proc_time = (time.perf_counter() - proc_start) * 1000
         self.processing_times.append(proc_time)
         self.last_proc_time = proc_time
-
-        # Keep only last 100 samples
-        if len(self.segmentation_times) > 100:
-            self.segmentation_times.pop(0)
-        if len(self.processing_times) > 100:
-            self.processing_times.pop(0)
-        if len(self.framing_times) > 100:
-            self.framing_times.pop(0)
 
         return result
 

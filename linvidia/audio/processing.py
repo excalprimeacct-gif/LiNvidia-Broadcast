@@ -52,6 +52,9 @@ class AudioProcessor:
         # Frequency bins
         self.freq_bins = self.n_fft // 2 + 1
 
+        # Lazily-cached mel filterbank, keyed by n_mels.
+        self._mel_cache: dict = {}
+
     def _create_window(self, window_type: str, size: int) -> np.ndarray:
         """Create window function"""
         if window_type == 'hann':
@@ -180,13 +183,11 @@ class AudioProcessor:
         Returns:
             mel_magnitude: Mel-scale magnitude
         """
-        # Create mel filterbank
-        mel_basis = self._mel_filterbank(n_mels)
-
-        # Apply mel filterbank
-        mel_magnitude = mel_basis @ magnitude
-
-        return mel_magnitude
+        mel_basis = self._mel_cache.get(n_mels)
+        if mel_basis is None:
+            mel_basis = self._mel_filterbank(n_mels)
+            self._mel_cache[n_mels] = mel_basis
+        return mel_basis @ magnitude
 
     def _mel_filterbank(self, n_mels: int) -> np.ndarray:
         """Create mel filterbank matrix"""
