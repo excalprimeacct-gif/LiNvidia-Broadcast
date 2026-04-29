@@ -6,7 +6,7 @@ Supports multiple backends: PulseAudio, PipeWire, PortAudio
 import numpy as np
 import sounddevice as sd
 from typing import Optional
-from queue import Queue, Full
+from queue import Queue, Full, Empty
 import threading
 
 
@@ -76,32 +76,36 @@ class AudioPlayback:
         """Internal callback for audio stream"""
         if status:
             print(f"Audio playback status: {status}")
-            if status.output_underflow:
-                self.buffer_underruns += 1
 
         try:
-            # Get frame from queue
+            # Get frame from queue (no double-counting: status underflow above
+            # is just a hardware warning; queue-empty here is the real underrun).
             audio_frame = self.queue.get_nowait()
-
-            # Reshape for output if needed
-            if audio_frame.ndim == 1:
-                audio_frame = audio_frame.reshape(-1, 1)
-
-            # Ensure correct shape
-            if audio_frame.shape[0] != frames:
-                # Resize if needed
-                if audio_frame.shape[0] < frames:
-                    audio_frame = np.pad(audio_frame, ((0, frames - audio_frame.shape[0]), (0, 0)))
-                else:
-                    audio_frame = audio_frame[:frames]
-
-            outdata[:] = audio_frame
-            self.frames_played += 1
-
-        except Exception as e:
-            # Queue empty - output silence
+        except Empty:
             outdata[:] = self.silence
             self.buffer_underruns += 1
+            return
+
+        # Reshape for output if needed
+        if audio_frame.ndim == 1:
+            audio_frame = audio_frame.reshape(-1, 1)
+
+        # Match channel count expected by the stream
+        if audio_frame.shape[1] != self.channels:
+            if audio_frame.shape[1] == 1 and self.channels > 1:
+                audio_frame = np.broadcast_to(audio_frame, (audio_frame.shape[0], self.channels))
+            else:
+                audio_frame = audio_frame[:, : self.channels]
+
+        # Match block size expected by the stream
+        if audio_frame.shape[0] != frames:
+            if audio_frame.shape[0] < frames:
+                audio_frame = np.pad(audio_frame, ((0, frames - audio_frame.shape[0]), (0, 0)))
+            else:
+                audio_frame = audio_frame[:frames]
+
+        outdata[:] = audio_frame
+        self.frames_played += 1
 
     def start(self):
         """Start audio playback"""

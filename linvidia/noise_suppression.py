@@ -8,6 +8,7 @@ for low-latency noise suppression
 import numpy as np
 import threading
 import time
+from collections import deque
 from typing import Optional
 from loguru import logger
 
@@ -84,10 +85,10 @@ class RealtimeNoiseSuppression:
         self.is_running = False
         self.processing_thread = None
 
-        # Statistics
+        # Statistics (bounded ring-buffers; pop(0) on a list is O(n))
         self.frames_processed = 0
-        self.processing_times = []
-        self.latencies = []
+        self.processing_times = deque(maxlen=1000)
+        self.latencies = deque(maxlen=1000)
 
     def _process_callback(self, audio_frame: np.ndarray):
         """
@@ -127,10 +128,6 @@ class RealtimeNoiseSuppression:
 
             self.frames_processed += 1
             self.processing_times.append(processing_time)
-
-            # Keep only last 1000 samples for stats
-            if len(self.processing_times) > 1000:
-                self.processing_times.pop(0)
 
         except Exception as e:
             logger.error(f"Error processing audio frame: {e}")

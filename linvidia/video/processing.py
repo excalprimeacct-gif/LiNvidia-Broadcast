@@ -93,11 +93,12 @@ class VideoProcessor:
         # Blur the entire image
         blurred = cv2.GaussianBlur(image, (self.blur_strength, self.blur_strength), 0)
 
-        # Expand mask to 3 channels
-        mask_3ch = np.expand_dims(mask, axis=2)
+        # Expand mask to 3 channels (broadcast, no copy)
+        mask_3ch = mask[..., np.newaxis]
 
-        # Blend: person (mask=1) from original, background (mask=0) from blurred
-        result = (image * mask_3ch + blurred * (1 - mask_3ch)).astype(np.uint8)
+        # Blend: person (mask=1) from original, background (mask=0) from blurred.
+        # Clip before uint8 cast to avoid wraparound from float rounding.
+        result = np.clip(image * mask_3ch + blurred * (1.0 - mask_3ch), 0, 255).astype(np.uint8)
 
         return result
 
@@ -121,12 +122,8 @@ class VideoProcessor:
         # Create background with solid color
         background = np.full_like(image, background_color, dtype=np.uint8)
 
-        # Expand mask to 3 channels
-        mask_3ch = np.expand_dims(mask, axis=2)
-
-        # Blend
-        result = (image * mask_3ch + background * (1 - mask_3ch)).astype(np.uint8)
-
+        mask_3ch = mask[..., np.newaxis]
+        result = np.clip(image * mask_3ch + background * (1.0 - mask_3ch), 0, 255).astype(np.uint8)
         return result
 
     def apply_replacement(
@@ -157,12 +154,8 @@ class VideoProcessor:
         if background.shape[:2] != image.shape[:2]:
             background = cv2.resize(background, (image.shape[1], image.shape[0]))
 
-        # Expand mask to 3 channels
-        mask_3ch = np.expand_dims(mask, axis=2)
-
-        # Blend
-        result = (image * mask_3ch + background * (1 - mask_3ch)).astype(np.uint8)
-
+        mask_3ch = mask[..., np.newaxis]
+        result = np.clip(image * mask_3ch + background * (1.0 - mask_3ch), 0, 255).astype(np.uint8)
         return result
 
     def smooth_mask(self, mask: np.ndarray, kernel_size: int = 5) -> np.ndarray:
@@ -308,7 +301,7 @@ def apply_bokeh_blur(
     blurred = cv2.GaussianBlur(image, (kernel_size, kernel_size), 0)
 
     # Blend based on mask
-    mask_3ch = np.expand_dims(mask, axis=2)
-    result = (image * mask_3ch + blurred * (1 - mask_3ch)).astype(np.uint8)
+    mask_3ch = mask[..., np.newaxis]
+    result = np.clip(image * mask_3ch + blurred * (1.0 - mask_3ch), 0, 255).astype(np.uint8)
 
     return result
